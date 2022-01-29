@@ -1,5 +1,5 @@
 # gg
-### priquisite
+### prerequisite
 - go 1.16
 - protoc
 - grpc
