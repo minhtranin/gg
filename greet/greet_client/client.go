@@ -32,7 +32,8 @@ func main() {
 	}
 	log.Printf("response from greet: %v", res.Result)
 	// doStreamingGreet(c)
-	doStreamingServer(c)
+	// doStreamingServer(c)
+	doBiDiStreaming(c)
 }
 
 func doStreamingGreet(c __.GreetServiceClient) {
@@ -63,19 +64,19 @@ func doStreamingGreet(c __.GreetServiceClient) {
 func doStreamingServer(c __.GreetServiceClient) {
 	stream, err := c.LongGreet(context.Background())
 	req := []*__.LongGreetRequest{
-		&__.LongGreetRequest{
+		{
 			Greeting: &__.Greeting{
 				FirstName: "sMinh",
 				LastName:  "sPro",
 			},
 		},
-		&__.LongGreetRequest{
+		{
 			Greeting: &__.Greeting{
 				FirstName: "sMinh",
 				LastName:  "sVip",
 			},
 		},
-		&__.LongGreetRequest{
+		{
 			Greeting: &__.Greeting{
 				FirstName: "sMinh",
 				LastName:  "s1",
@@ -95,4 +96,74 @@ func doStreamingServer(c __.GreetServiceClient) {
 		log.Fatalf("error while receiving response from long great: %v", err)
 	}
 	fmt.Printf("long greet response: %v", res)
+}
+
+func doBiDiStreaming(c __.GreetServiceClient) {
+	fmt.Println("Starting to do a BiDi Streaming RPC...")
+
+	// we create a stream by invoking the client
+	stream, err := c.GreetEveryone(context.Background())
+	if err != nil {
+		log.Fatalf("Error while creating stream: %v", err)
+		return
+	}
+
+	requests := []*__.GreetEveryoneRequest{
+		{
+			Greeting: &__.Greeting{
+				FirstName: "Stephane",
+			},
+		},
+		{
+			Greeting: &__.Greeting{
+				FirstName: "John",
+			},
+		},
+		{
+			Greeting: &__.Greeting{
+				FirstName: "Lucy",
+			},
+		},
+		{
+			Greeting: &__.Greeting{
+				FirstName: "Mark",
+			},
+		},
+		{
+			Greeting: &__.Greeting{
+				FirstName: "Piper",
+			},
+		},
+	}
+
+	waitc := make(chan struct{})
+	// we send a bunch of messages to the client (go routine)
+	go func() {
+		// function to send a bunch of messages
+		for _, req := range requests {
+			fmt.Printf("Sending message: %v\n", req)
+			stream.Send(req)
+			time.Sleep(1000 * time.Millisecond)
+		}
+		stream.CloseSend()
+	}()
+	// we receive a bunch of messages from the client (go routine)
+	go func() {
+		// function to receive a bunch of messages
+		for {
+			res, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				log.Fatalf("Error while receiving: %v", err)
+				break
+			}
+			fmt.Printf("Received: %v\n", res.GetResult())
+		}
+		close(waitc)
+	}()
+
+	// block until everything is done
+	<-waitc
 }
